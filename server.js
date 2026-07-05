@@ -7,44 +7,61 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const FILES_DIR = path.join(__dirname, 'files');
 
-// Ensure files directory exists
+// Create files directory if it doesn't exist
 if (!fs.existsSync(FILES_DIR)) {
   fs.mkdirSync(FILES_DIR, { recursive: true });
 }
 
-// POST /create - generate a 100 MB file
-app.post('/create', (req, res) => {
-  const id = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-  const filename = `testfile-${id}.bin`;
-  const filepath = path.join(FILES_DIR, filename);
-
+// Create the default 100 MB test file if missing
+const DEFAULT_FILE = 'testfile-100mb.bin';
+const defaultFilePath = path.join(FILES_DIR, DEFAULT_FILE);
+if (!fs.existsSync(defaultFilePath)) {
+  console.log('Creating default 100 MB file...');
   try {
-    // Create 100 MB zero-filled file using dd (busybox)
-    execSync(`dd if=/dev/zero of="${filepath}" bs=1M count=100`, { stdio: 'ignore' });
-    res.json({
-      success: true,
-      url: `/download/${filename}`
-    });
+    execSync(`dd if=/dev/zero of="${defaultFilePath}" bs=1M count=100`, { stdio: 'ignore' });
+    console.log('Default file created.');
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: 'File creation failed' });
+    console.error('Failed to create default file:', err);
   }
-});
+}
 
-// GET /download/:filename - serve the file
-app.get('/download/:filename', (req, res) => {
-  const filepath = path.join(FILES_DIR, req.params.filename);
-  if (!fs.existsSync(filepath)) {
-    return res.status(404).send('File not found');
-  }
-  res.download(filepath, req.params.filename);
-});
+// Serve files statically for direct downloads
+app.use('/files', express.static(FILES_DIR));
 
-// Health check
+// Root route – simple HTML listing page
 app.get('/', (req, res) => {
-  res.send('Railway test file service is running.');
+  fs.readdir(FILES_DIR, (err, files) => {
+    if (err) {
+      return res.status(500).send('Unable to list files');
+    }
+
+    const fileLinks = files
+      .map(file => `<li><a href="/files/${encodeURIComponent(file)}">${file}</a></li>`)
+      .join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Test File Server</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: sans-serif; margin: 2rem; }
+          ul { list-style: none; padding: 0; }
+          li { margin: 0.5rem 0; }
+          a { font-size: 1.2rem; }
+        </style>
+      </head>
+      <body>
+        <h1>Available files</h1>
+        <ul>${fileLinks || '<li>No files found.</li>'}</ul>
+      </body>
+      </html>
+    `;
+    res.send(html);
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
