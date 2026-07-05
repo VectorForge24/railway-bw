@@ -1,0 +1,12 @@
+{
+  "name": "railway-file-creator",
+  "version": "1.0.0",
+  "description": "Create a 100 MB test file and get a download link",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
